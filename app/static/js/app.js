@@ -155,12 +155,11 @@ function setupEventListeners() {
     currentUser = null;
     currentConversationId = null;
     localStorage.removeItem("token");
+    conversations = [];
+    documents = [];
     updateAuthUI();
-    showToast("Signed out successfully.");
     renderWelcomeScreen();
-    docList.innerHTML = '<div class="text-subtle text-center py-4 small">Sign in to view uploaded documents.</div>';
-    conversationList.innerHTML = '<div class="text-subtle text-center py-4 small">Sign in to see past chats.</div>';
-    docCountBadge.textContent = "0";
+    showToast("Signed out successfully.");
   });
 
   // New Chat Button
@@ -307,6 +306,30 @@ function updateAuthUI() {
   } else {
     authBtn.classList.remove("d-none");
     userProfile.classList.add("d-none");
+    docCountBadge.textContent = "0";
+
+    // Show clean, welcoming signed-out state with Sign In buttons
+    conversationList.innerHTML = `
+      <div class="text-subtle text-center py-4 px-2 small">
+        <i class="bi bi-chat-square-text fs-3 d-block mb-2 text-primary opacity-75"></i>
+        <div class="fw-medium text-light mb-1">Sign in to save chat history</div>
+        <div class="text-subtle mb-3" style="font-size: 0.74rem;">Your conversations will be privately saved here.</div>
+        <button class="btn btn-glass btn-sm px-3" onclick="authModal.show()">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+        </button>
+      </div>
+    `;
+
+    docList.innerHTML = `
+      <div class="text-subtle text-center py-4 px-2 small">
+        <i class="bi bi-file-earmark-lock fs-3 d-block mb-2 text-primary opacity-75"></i>
+        <div class="fw-medium text-light mb-1">Sign in to manage documents</div>
+        <div class="text-subtle mb-3" style="font-size: 0.74rem;">Upload and view reference PDFs for your private knowledge base.</div>
+        <button class="btn btn-glass btn-sm px-3" onclick="authModal.show()">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+        </button>
+      </div>
+    `;
   }
 }
 
@@ -314,12 +337,23 @@ function updateAuthUI() {
 // Conversation / Chat History
 // ---------------------------------------------------------------------------
 async function fetchConversations() {
-  if (!token) return;
+  if (!token) {
+    updateAuthUI();
+    return;
+  }
   try {
     const res = await fetch("/chat/conversations", {
       headers: { "Authorization": `Bearer ${token}` }
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (res.status === 401) {
+        token = null;
+        currentUser = null;
+        localStorage.removeItem("token");
+        updateAuthUI();
+      }
+      return;
+    }
     conversations = await res.json();
     renderConversationList();
   } catch (err) {
@@ -444,12 +478,23 @@ async function deleteConversation(conversationId, event) {
 // Documents Management & Viewing
 // ---------------------------------------------------------------------------
 async function fetchDocuments() {
-  if (!token) return;
+  if (!token) {
+    updateAuthUI();
+    return;
+  }
   try {
     const res = await fetch("/documents", {
       headers: { "Authorization": `Bearer ${token}` }
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (res.status === 401) {
+        token = null;
+        currentUser = null;
+        localStorage.removeItem("token");
+        updateAuthUI();
+      }
+      return;
+    }
     documents = await res.json();
 
     docCountBadge.textContent = documents.length;

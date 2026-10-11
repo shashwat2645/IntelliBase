@@ -111,9 +111,13 @@
           </div>
           
           <div id="conversationList" class="conversation-list flex-grow-1 overflow-y-auto px-2 py-1">
-            <div class="text-subtle text-center py-4 small">
-              <span class="spinner-border spinner-border-sm me-1 text-primary"></span>
-              Loading conversations...
+            <div class="text-subtle text-center py-4 px-2 small">
+              <i class="bi bi-chat-square-text fs-3 d-block mb-2 text-primary opacity-75"></i>
+              <div class="fw-medium text-light mb-1">Sign in to save chat history</div>
+              <div class="text-subtle mb-3" style="font-size: 0.74rem;">Your conversations will be privately saved here.</div>
+              <button class="btn btn-glass btn-sm px-3" data-bs-toggle="modal" data-bs-target="#authModal">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+              </button>
             </div>
           </div>
         </div>
@@ -141,9 +145,13 @@
 
           <!-- Document List -->
           <div id="docList" class="doc-list-container flex-grow-1 overflow-y-auto px-2 py-1">
-            <div class="text-subtle text-center py-4 small">
-              <span class="spinner-border spinner-border-sm me-1 text-primary"></span>
-              Loading documents...
+            <div class="text-subtle text-center py-4 px-2 small">
+              <i class="bi bi-file-earmark-lock fs-3 d-block mb-2 text-primary opacity-75"></i>
+              <div class="fw-medium text-light mb-1">Sign in to manage documents</div>
+              <div class="text-subtle mb-3" style="font-size: 0.74rem;">Upload and view reference PDFs for your private knowledge base.</div>
+              <button class="btn btn-glass btn-sm px-3" data-bs-toggle="modal" data-bs-target="#authModal">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+              </button>
             </div>
           </div>
 
