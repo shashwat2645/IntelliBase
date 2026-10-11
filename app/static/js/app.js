@@ -41,6 +41,63 @@ const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 
+// Confirmation Modal Elements
+const confirmModalElement = document.getElementById("confirmModal");
+const confirmModalTitle = document.getElementById("confirmModalTitle");
+const confirmModalMessage = document.getElementById("confirmModalMessage");
+const confirmModalActionBtn = document.getElementById("confirmModalActionBtn");
+let pendingConfirmCallback = null;
+
+function getConfirmModalInstance() {
+  const el = document.getElementById("confirmModal");
+  if (!el || typeof bootstrap === "undefined") return null;
+  return bootstrap.Modal.getOrCreateInstance(el);
+}
+
+if (confirmModalElement) {
+  confirmModalElement.addEventListener("hidden.bs.modal", () => {
+    pendingConfirmCallback = null;
+    document.querySelectorAll(".modal-backdrop").forEach(b => {
+      if (!document.querySelector(".modal.show")) {
+        b.remove();
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("overflow");
+        document.body.style.removeProperty("padding-right");
+      }
+    });
+  });
+}
+
+if (confirmModalActionBtn) {
+  confirmModalActionBtn.addEventListener("click", async () => {
+    if (typeof pendingConfirmCallback === "function") {
+      const cb = pendingConfirmCallback;
+      pendingConfirmCallback = null;
+      const modalInstance = getConfirmModalInstance();
+      if (modalInstance) modalInstance.hide();
+      await cb();
+    }
+  });
+}
+
+function requestConfirmation(title, message, callback) {
+  const modalEl = document.getElementById("confirmModal");
+  const titleEl = document.getElementById("confirmModalTitle");
+  const msgEl = document.getElementById("confirmModalMessage");
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  pendingConfirmCallback = callback;
+
+  if (modalEl && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modalInstance.show();
+  } else {
+    if (confirm(`${title}\n${message}`)) {
+      callback();
+    }
+  }
+}
+
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
@@ -113,16 +170,22 @@ function setupEventListeners() {
   });
 
   // Delete Active Chat Button
-  deleteActiveChatBtn.addEventListener("click", async () => {
+  deleteActiveChatBtn.addEventListener("click", () => {
     if (currentConversationId) {
-      if (confirm("Delete this conversation and its message history?")) {
-        await deleteConversation(currentConversationId);
-      }
+      deleteConversation(currentConversationId);
     }
   });
 
   // Refresh Docs
   refreshDocsBtn.addEventListener("click", fetchDocuments);
+
+  // Switch to Documents Tab
+  const docsTab = document.getElementById("docs-tab");
+  if (docsTab) {
+    docsTab.addEventListener("click", () => {
+      fetchDocuments();
+    });
+  }
 
   // Upload File Click & Drag-Drop
   dropzone.addEventListener("click", () => fileInput.click());
@@ -287,6 +350,10 @@ function renderConversationList() {
 }
 
 function startNewChat() {
+  if (activeTypewriterTimer) {
+    clearInterval(activeTypewriterTimer);
+    activeTypewriterTimer = null;
+  }
   currentConversationId = null;
   activeChatTitle.textContent = "New Chat";
   deleteActiveChatBtn.classList.add("d-none");
@@ -297,6 +364,10 @@ function startNewChat() {
 
 async function selectConversation(conversationId) {
   if (!token) return;
+  if (activeTypewriterTimer) {
+    clearInterval(activeTypewriterTimer);
+    activeTypewriterTimer = null;
+  }
   currentConversationId = conversationId;
   renderConversationList();
 
@@ -342,21 +413,31 @@ async function deleteConversation(conversationId, event) {
   if (event) event.stopPropagation();
   if (!token) return;
 
-  try {
-    const res = await fetch(`/chat/conversations/${conversationId}`, {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error("Failed to delete conversation");
+  const numId = Number(conversationId);
+  const conv = conversations.find(c => Number(c.id) === numId);
+  const convTitle = conv ? `"${conv.title}"` : "this conversation";
 
-    showToast("Conversation deleted.");
-    if (currentConversationId === conversationId) {
-      startNewChat();
+  requestConfirmation(
+    "Delete Conversation?",
+    `Are you sure you want to delete ${convTitle} and all its message history?`,
+    async () => {
+      try {
+        const res = await fetch(`/chat/conversations/${numId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to delete conversation");
+
+        showToast("Conversation deleted.");
+        if (Number(currentConversationId) === numId) {
+          startNewChat();
+        }
+        await fetchConversations();
+      } catch (err) {
+        showToast(err.message, "danger");
+      }
     }
-    await fetchConversations();
-  } catch (err) {
-    showToast(err.message, "danger");
-  }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -462,20 +543,25 @@ async function handleFileUpload() {
 
 async function deleteDocumentItem(docId, filename) {
   if (!token) return;
-  if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
 
-  try {
-    const res = await fetch(`/documents/${docId}`, {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error("Failed to delete document");
+  requestConfirmation(
+    "Delete Document?",
+    `Are you sure you want to delete "${filename}"? Its vector chunks will also be removed from your knowledge base.`,
+    async () => {
+      try {
+        const res = await fetch(`/documents/${docId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to delete document");
 
-    showToast(`Deleted "${filename}".`);
-    await fetchDocuments();
-  } catch (err) {
-    showToast(err.message, "danger");
-  }
+        showToast(`Deleted "${filename}".`);
+        await fetchDocuments();
+      } catch (err) {
+        showToast(err.message, "danger");
+      }
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -528,7 +614,7 @@ async function sendChatMessage() {
       body: JSON.stringify({
         query: query,
         conversation_id: currentConversationId,
-        top_k: 4
+        top_k: 8
       })
     });
 
@@ -545,15 +631,19 @@ async function sendChatMessage() {
       deleteActiveChatBtn.classList.remove("d-none");
     }
 
+    if (data.conversation_title) {
+      activeChatTitle.textContent = data.conversation_title;
+    }
+
     // Refresh conversation list to show new conversation / updated title
     await fetchConversations();
-    const activeConv = conversations.find(c => c.id === currentConversationId);
+    const activeConv = conversations.find(c => Number(c.id) === Number(currentConversationId));
     if (activeConv) {
       activeChatTitle.textContent = activeConv.title;
     }
 
-    // Append synthesized assistant answer with clean citations
-    appendMessageBubble(data.answer, "assistant", data.sources || []);
+    // Append synthesized assistant answer with animated typewriter effect
+    appendMessageBubble(data.answer, "assistant", data.sources || [], true);
   } catch (err) {
     const elem = document.getElementById(thinkingId);
     if (elem) {
@@ -569,7 +659,14 @@ async function sendChatMessage() {
   }
 }
 
-function appendMessageBubble(text, role, sources = []) {
+let activeTypewriterTimer = null;
+
+function appendMessageBubble(text, role, sources = [], animate = false) {
+  if (activeTypewriterTimer) {
+    clearInterval(activeTypewriterTimer);
+    activeTypewriterTimer = null;
+  }
+
   const row = document.createElement("div");
   row.className = `message-row ${role}`;
 
@@ -578,61 +675,114 @@ function appendMessageBubble(text, role, sources = []) {
 
   if (role === "user") {
     bubble.textContent = text;
-  } else {
-    // Render ChatGPT-style rich Markdown
-    let parsedContent = "";
-    if (window.marked && typeof marked.parse === "function") {
-      parsedContent = marked.parse(text);
-    } else {
-      parsedContent = escapeHtml(text).replace(/\n/g, "<br>");
-    }
-
-    let html = `<div class="markdown-body">${parsedContent}</div>`;
-
-    // Render Clean Sources & Citations (PDF filenames & quoted lines only, NO chunk IDs!)
-    if (sources && sources.length > 0) {
-      html += `
-        <div class="citations-wrapper">
-          <div class="citations-title">
-            <i class="bi bi-file-earmark-check-fill text-primary"></i>
-            <span>Grounded in your documents</span>
-          </div>
-          <div class="citations-cards">
-      `;
-
-      sources.forEach((src, idx) => {
-        const cleanSnippet = (src.snippet || "").trim();
-        // Match document ID for view link if available
-        const matchedDoc = documents.find(d => d.filename === src.filename);
-        const viewLink = matchedDoc && token
-          ? `<a href="/documents/${matchedDoc.id}/view?token=${encodeURIComponent(token)}" target="_blank" class="btn-icon-action btn-view py-0 px-2" style="font-size: 0.72rem;">
-              <i class="bi bi-eye"></i> View PDF
-             </a>`
-          : "";
-
-        html += `
-          <div class="citation-item-card">
-            <div class="citation-header">
-              <span class="citation-filename">
-                <i class="bi bi-file-earmark-pdf text-danger"></i>
-                <span>${escapeHtml(src.filename)}</span>
-              </span>
-              ${viewLink}
-            </div>
-            ${cleanSnippet ? `<div class="citation-quote">"${escapeHtml(cleanSnippet)}"</div>` : ''}
-          </div>
-        `;
-      });
-
-      html += `</div></div>`;
-    }
-
-    bubble.innerHTML = html;
+    row.appendChild(bubble);
+    chatMessages.appendChild(row);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return;
   }
+
+  // Assistant bubble with separate markdown container and citations mount
+  const markdownContainer = document.createElement("div");
+  markdownContainer.className = "markdown-body";
+  bubble.appendChild(markdownContainer);
+
+  const citationsContainer = document.createElement("div");
+  citationsContainer.className = "citations-mount";
+  bubble.appendChild(citationsContainer);
 
   row.appendChild(bubble);
   chatMessages.appendChild(row);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const renderCitations = () => {
+    if (sources && sources.length > 0) {
+      const uniqueSources = [];
+      const seenFilenames = new Set();
+
+      sources.forEach(src => {
+        const fname = src.filename || "";
+        if (fname && !seenFilenames.has(fname)) {
+          seenFilenames.add(fname);
+          uniqueSources.push(src);
+        }
+      });
+
+      if (uniqueSources.length > 0) {
+        let html = `
+          <div class="citations-wrapper">
+            <div class="citations-title">
+              <i class="bi bi-file-earmark-check-fill text-primary"></i>
+              <span>Grounded in your documents</span>
+            </div>
+            <div class="citations-cards">
+        `;
+
+        uniqueSources.forEach(src => {
+          let docId = src.document_id;
+          if (!docId && documents && documents.length > 0) {
+            const matched = documents.find(d => d.filename === src.filename);
+            if (matched) docId = matched.id;
+          }
+
+          const viewLink = docId && token
+            ? `<a href="/documents/${docId}/view?token=${encodeURIComponent(token)}" target="_blank" class="btn-icon-action btn-view py-1 px-2.5" style="font-size: 0.76rem;">
+                <i class="bi bi-eye"></i> View PDF
+               </a>`
+            : "";
+
+          html += `
+            <div class="citation-item-card d-flex align-items-center justify-content-between py-2 px-3">
+              <span class="citation-filename d-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark-pdf-fill text-danger fs-6"></i>
+                <span class="fw-medium">${escapeHtml(src.filename)}</span>
+              </span>
+              ${viewLink}
+            </div>
+          `;
+        });
+
+        html += `</div></div>`;
+        citationsContainer.innerHTML = html;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    }
+  };
+
+  const parseMarkdown = (raw) => {
+    if (window.marked && typeof marked.parse === "function") {
+      return marked.parse(raw);
+    }
+    return escapeHtml(raw).replace(/\n/g, "<br>");
+  };
+
+  if (!animate) {
+    markdownContainer.innerHTML = parseMarkdown(text);
+    renderCitations();
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return;
+  }
+
+  // Typewriter streaming effect (word by word)
+  const tokens = text.match(/\S+|\s+/g) || [text];
+  let tokenIdx = 0;
+  // Adaptive step: completes in ~1.8 to 3.0 seconds
+  const step = Math.max(1, Math.ceil(tokens.length / 90));
+
+  activeTypewriterTimer = setInterval(() => {
+    tokenIdx += step;
+    if (tokenIdx >= tokens.length) {
+      clearInterval(activeTypewriterTimer);
+      activeTypewriterTimer = null;
+      markdownContainer.innerHTML = parseMarkdown(text);
+      renderCitations();
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+
+    const currentSlice = tokens.slice(0, tokenIdx).join("");
+    markdownContainer.innerHTML = parseMarkdown(currentSlice) + '<span class="typing-cursor">▋</span>';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }, 22);
 }
 
 // ---------------------------------------------------------------------------

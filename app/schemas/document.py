@@ -19,14 +19,16 @@ class DocumentItem(BaseModel):
 class QueryRequest(BaseModel):
     conversation_id: Optional[int] = None
     query: str
-    top_k: Optional[int] = 4
+    top_k: Optional[int] = 8
 
 class ChunkSource(BaseModel):
+    document_id: Optional[int] = None
     filename: str
-    snippet: str
+    snippet: Optional[str] = None
 
 class QueryResponse(BaseModel):
     conversation_id: int
+    conversation_title: Optional[str] = None
     query: str
     answer: str
     sources: List[ChunkSource]

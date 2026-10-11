@@ -105,7 +105,7 @@
       <div class="tab-content sidebar-tab-content flex-grow-1 overflow-hidden" id="sidebarTabContent">
         
         <!-- Tab 1: Chat Threads List -->
-        <div class="tab-pane fade show active h-100 d-flex flex-column" id="chatsTabPane" role="tabpanel">
+        <div class="tab-pane show active" id="chatsTabPane" role="tabpanel">
           <div class="sidebar-section-header px-3 py-1 d-flex justify-content-between align-items-center">
             <span class="text-uppercase fw-semibold text-subtle" style="font-size: 0.7rem; letter-spacing: 0.6px;">Recent Conversations</span>
           </div>
@@ -119,7 +119,7 @@
         </div>
 
         <!-- Tab 2: Document Management & Upload -->
-        <div class="tab-pane fade h-100 d-flex flex-column" id="docsTabPane" role="tabpanel">
+        <div class="tab-pane" id="docsTabPane" role="tabpanel">
           
           <!-- Upload Dropzone -->
           <div class="px-3 pt-2 pb-2">
@@ -226,6 +226,25 @@
           </form>
           <div class="text-center text-muted small mt-3" id="authToggleText">
             Don't have an account? <a href="#" id="authToggleLink" class="text-primary text-decoration-none fw-semibold">Create one</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content glass-modal shadow-lg p-3 text-center">
+        <div class="modal-body p-2">
+          <div class="mb-2 text-danger">
+            <i class="bi bi-exclamation-triangle fs-1"></i>
+          </div>
+          <h6 class="fw-bold mb-1" id="confirmModalTitle">Are you sure?</h6>
+          <p class="text-subtle small mb-3" id="confirmModalMessage">This action cannot be undone.</p>
+          <div class="d-flex justify-content-center gap-2">
+            <button type="button" class="btn btn-glass btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger btn-sm px-3" id="confirmModalActionBtn">Delete</button>
           </div>
         </div>
       </div>

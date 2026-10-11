@@ -121,8 +121,49 @@ async def view_document(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     doc = await get_document_by_id(db, document_id, user.id)
-    if not doc or not doc.file_path or not os.path.exists(doc.file_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found on disk")
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        # Auto-reconstruct PDF from stored database chunks
+        from sqlalchemy.future import select
+        from app.models.document import DocumentChunk
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+
+        chunks_res = await db.execute(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id == doc.id)
+            .order_by(DocumentChunk.chunk_index)
+        )
+        chunks = chunks_res.scalars().all()
+        if not chunks:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found on disk")
+
+        safe_name = f"{user.id}_{doc.id}_{doc.filename}"
+        out_path = os.path.join(UPLOAD_DIR, safe_name)
+
+        doc_pdf = SimpleDocTemplate(out_path, pagesize=letter, rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54)
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("DocTitle", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#1e293b"))
+        body_style = ParagraphStyle("DocBody", parent=styles["Normal"], fontSize=10, leading=14, textColor=colors.HexColor("#334155"))
+
+        story = [
+            Paragraph(doc.filename, title_style),
+            Spacer(1, 15),
+        ]
+        full_text = "\n\n".join([c.content for c in chunks])
+        for para in full_text.split("\n\n"):
+            if para.strip():
+                escaped = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+                story.append(Paragraph(escaped, body_style))
+                story.append(Spacer(1, 10))
+
+        doc_pdf.build(story)
+        doc.file_path = out_path
+        await db.commit()
 
     import urllib.parse
     encoded_name = urllib.parse.quote(doc.filename)

@@ -1,15 +1,16 @@
 import io
+import unicodedata
 from typing import List
 from pypdf import PdfReader
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extracts all plain text from PDF bytes and removes PostgreSQL-incompatible null characters."""
+    """Extracts all plain text from PDF bytes, decomposes ligatures, and removes null characters."""
     reader = PdfReader(io.BytesIO(file_bytes))
     extracted_text = []
     for page in reader.pages:
         page_text = page.extract_text()
         if page_text:
-            cleaned = page_text.replace("\x00", "")
+            cleaned = unicodedata.normalize("NFKD", page_text).replace("\x00", "")
             if cleaned.strip():
                 extracted_text.append(cleaned)
     return "\n".join(extracted_text)

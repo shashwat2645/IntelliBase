@@ -12,7 +12,7 @@ from app.schemas.document import (
     ConversationResponse,
     ConversationDetailResponse,
 )
-from app.services.ai import get_embedding, generate_rag_response
+from app.services.ai import get_embedding, generate_rag_response, generate_conversation_title
 from app.repositories.document import search_user_chunks
 from app.repositories.chat import (
     get_user_conversations,
@@ -79,64 +79,82 @@ async def query_knowledge_base(
         )
 
     # 1. Resolve or create active Conversation
+    is_new_conversation = False
     if query_in.conversation_id:
         conv = await get_conversation_with_messages(db, query_in.conversation_id, current_user.id)
         if not conv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     else:
-        # Auto-title conversation with the first 35 characters of user question
-        title = clean_query[:35] + ("..." if len(clean_query) > 35 else "")
-        conv = await create_conversation(db, current_user.id, title=title)
+        is_new_conversation = True
+        conv = await create_conversation(db, current_user.id, title="New Chat")
 
-    # 2. Persist user message to chat history
+    # 2. Capture prior conversation messages for conversational continuity
+    chat_history = []
+    if query_in.conversation_id and conv:
+        try:
+            if conv.messages:
+                for msg in conv.messages[-6:]:
+                    chat_history.append({"role": msg.role, "content": msg.content})
+        except Exception:
+            chat_history = []
+
+    # 3. Persist user message to chat history
     await add_message(db, conversation_id=conv.id, role="user", content=clean_query)
 
-    # 3. Generate 768-dim vector embedding for the query
+    # 4. Generate 768-dim vector embedding for the query
     query_vector = get_embedding(clean_query)
 
-    # 4. Vector search pgvector for the most semantically relevant chunks
+    # 5. Vector search pgvector for the most semantically relevant chunks
     matched_results = await search_user_chunks(
         db=db,
         user_id=current_user.id,
         query_vector=query_vector,
-        top_k=query_in.top_k or 4
+        top_k=query_in.top_k or 8
     )
 
     if not matched_results:
         no_docs_msg = "I couldn't find any relevant information in your uploaded documents. Please make sure you have uploaded relevant PDFs to your knowledge base."
         await add_message(db, conversation_id=conv.id, role="assistant", content=no_docs_msg, sources=[])
+        
+        # Title conversation if new
+        conv_title = conv.title
+        if is_new_conversation or conv.title == "New Chat":
+            conv_title = generate_conversation_title(clean_query)
+            await update_conversation_title(db, conv.id, conv_title)
+
         return QueryResponse(
             conversation_id=conv.id,
+            conversation_title=conv_title,
             query=clean_query,
             answer=no_docs_msg,
             sources=[]
         )
 
-    # 5. Extract context chunks and clean source references (clean, human-friendly citations)
+    # 6. Extract context chunks and unique source document references
     context_chunks = []
     sources = []
-    seen_sources = set()
+    seen_docs = set()
 
     for chunk, filename in matched_results:
         context_chunks.append(chunk.content)
-        # Avoid duplicate citations for same passage snippet
-        key = (filename, chunk.content[:80])
-        if key not in seen_sources:
-            seen_sources.add(key)
+        if filename not in seen_docs:
+            seen_docs.add(filename)
             sources.append(
                 ChunkSource(
+                    document_id=chunk.document_id,
                     filename=filename,
-                    snippet=chunk.content
+                    snippet=None
                 )
             )
 
-    # 6. Synthesize natural, ChatGPT-style answer via Gemini
+    # 7. Synthesize natural, in-depth, ChatGPT-style answer via Gemini
     ai_answer = generate_rag_response(
         query=clean_query,
-        context_chunks=context_chunks
+        context_chunks=context_chunks,
+        chat_history=chat_history
     )
 
-    # 7. Persist assistant response with citations to database
+    # 8. Persist assistant response with citations to database
     sources_dict_list = [s.dict() for s in sources]
     await add_message(
         db=db,
@@ -146,13 +164,15 @@ async def query_knowledge_base(
         sources=sources_dict_list
     )
 
-    # If conversation was "New Chat", rename it to the question summary
-    if conv.title == "New Chat":
-        new_title = clean_query[:35] + ("..." if len(clean_query) > 35 else "")
-        await update_conversation_title(db, conv.id, new_title)
+    # 9. Generate a concise ChatGPT-style conversation title if new or default
+    conv_title = conv.title
+    if is_new_conversation or conv.title == "New Chat":
+        conv_title = generate_conversation_title(clean_query)
+        await update_conversation_title(db, conv.id, conv_title)
 
     return QueryResponse(
         conversation_id=conv.id,
+        conversation_title=conv_title,
         query=clean_query,
         answer=ai_answer,
         sources=sources
