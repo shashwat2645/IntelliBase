@@ -3,8 +3,19 @@ venv/
 __pycache__/
 *.pyc
 
-# Environment variables 
+# Environment variables & secrets
 .env
+.env.*
+!.env.example
+
+# Uploaded documents & user data (CRITICAL FOR PRIVACY)
+uploads/*
+!uploads/.gitkeep
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+*.log
 
 # MacOS
 .DS_Store
