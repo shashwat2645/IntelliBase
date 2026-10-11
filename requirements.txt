@@ -8,3 +8,5 @@ greenlet
 passlib[bcrypt]
 python-jose[cryptography]
 email-validator
+python-multipart
+pgvector
