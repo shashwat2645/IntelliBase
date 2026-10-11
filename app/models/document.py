@@ -10,7 +10,9 @@ class Document(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     filename = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    file_path = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
 
     user = relationship("User", backref="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")

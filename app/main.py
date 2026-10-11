@@ -1,5 +1,7 @@
 from fastapi import FastAPI
-from app.routers import auth
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from app.routers import auth, documents, chat
 
 app = FastAPI(
     title="AI Knowledge Base API",
@@ -8,12 +10,18 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+app.include_router(documents.router)
+app.include_router(chat.router)
+
+# Mount static assets
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the AI Knowledge Base API. See /docs for the API documentation."}
+    return FileResponse("app/static/index.html")
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
 
