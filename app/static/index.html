@@ -24,26 +24,26 @@
 <body>
 
   <!-- Top Navigation Bar -->
-  <nav class="navbar navbar-custom px-3 py-2">
-    <div class="container-fluid d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
+  <nav class="navbar navbar-custom px-2 px-sm-3 py-2">
+    <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap p-0">
+      <div class="d-flex align-items-center gap-2 brand-container flex-shrink-1 min-w-0">
         <!-- Mobile Sidebar Toggle -->
-        <button id="sidebarToggleBtn" class="btn btn-glass btn-sm d-lg-none me-1" type="button" title="Toggle Sidebar">
+        <button id="sidebarToggleBtn" class="btn btn-glass btn-sm d-lg-none me-1 flex-shrink-0" type="button" title="Toggle Sidebar">
           <i class="bi bi-layout-sidebar"></i>
         </button>
 
-        <a class="navbar-brand d-flex align-items-center gap-2 m-0 text-decoration-none" href="#">
-          <div class="brand-icon-wrap">
+        <a class="navbar-brand d-flex align-items-center gap-2 m-0 text-decoration-none min-w-0" href="#">
+          <div class="brand-icon-wrap flex-shrink-0">
             <i class="bi bi-stars fs-5 text-white"></i>
           </div>
-          <div>
-            <span class="brand-title brand-badge">IntelliBase</span>
-            <span class="brand-subtitle d-none d-sm-inline ms-2 text-muted small">AI Knowledge Assistant</span>
+          <div class="d-flex align-items-baseline min-w-0">
+            <span class="brand-title brand-badge text-truncate">IntelliBase</span>
+            <span class="brand-subtitle d-none d-md-inline ms-2 text-muted small text-truncate">AI Knowledge Assistant</span>
           </div>
         </a>
       </div>
 
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 user-nav-actions flex-shrink-0">
         <!-- Auth Trigger (when signed out) -->
         <button id="authBtn" class="btn btn-gradient btn-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#authModal">
           <i class="bi bi-box-arrow-in-right"></i>
@@ -52,13 +52,17 @@
 
         <!-- User Profile Dropdown (when signed in) -->
         <div id="userProfile" class="dropdown d-none">
-          <button class="btn btn-glass btn-sm dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-person-circle text-primary"></i>
-            <span id="userEmailText" class="small text-truncate" style="max-width: 160px;">user@example.com</span>
+          <button class="btn btn-glass btn-sm dropdown-toggle user-profile-btn d-flex align-items-center gap-1 gap-sm-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account settings">
+            <i class="bi bi-person-circle text-primary flex-shrink-0"></i>
+            <span id="userEmailText" class="small user-email-badge">user@example.com</span>
           </button>
-          <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary shadow-lg">
+          <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary shadow-lg py-2">
+            <li class="px-3 py-1 border-bottom border-secondary mb-1">
+              <div class="text-subtle" style="font-size: 0.7rem;">Signed in as</div>
+              <div id="userEmailDropdown" class="fw-semibold small text-light text-truncate" style="max-width: 200px;">user@example.com</div>
+            </li>
             <li>
-              <button id="signOutBtn" class="dropdown-item text-danger d-flex align-items-center gap-2" type="button">
+              <button id="signOutBtn" class="dropdown-item text-danger d-flex align-items-center gap-2 mt-1" type="button">
                 <i class="bi bi-box-arrow-left"></i>Sign Out
               </button>
             </li>
@@ -167,22 +171,25 @@
 
     </aside>
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop d-lg-none"></div>
+
     <!-- Main Content: Active Chat Interface -->
     <main class="chat-main-area">
       
       <!-- Top Chat Header -->
-      <div class="chat-header px-4 py-2 d-flex align-items-center justify-content-between border-bottom border-secondary">
-        <div class="d-flex align-items-center gap-3">
-          <div class="chat-header-avatar">
+      <div class="chat-header px-3 px-md-4 py-2 d-flex align-items-center justify-content-between border-bottom border-secondary flex-nowrap">
+        <div class="d-flex align-items-center gap-2 gap-sm-3 min-w-0">
+          <div class="chat-header-avatar flex-shrink-0">
             <i class="bi bi-chat-square-dots-fill text-primary"></i>
           </div>
-          <div>
-            <h6 id="activeChatTitle" class="m-0 fw-semibold text-truncate" style="max-width: 500px;">New Chat</h6>
-            <span class="text-subtle small" style="font-size: 0.72rem;">Synthesizing insights from your uploaded documents</span>
+          <div class="min-w-0">
+            <h6 id="activeChatTitle" class="m-0 fw-semibold text-truncate chat-title-responsive">New Chat</h6>
+            <span class="text-subtle small d-none d-sm-inline" style="font-size: 0.72rem;">Synthesizing insights from your uploaded documents</span>
           </div>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
           <button id="deleteActiveChatBtn" class="btn btn-glass btn-sm text-subtle d-none" title="Delete this conversation">
             <i class="bi bi-trash"></i>
           </button>
@@ -190,19 +197,19 @@
       </div>
 
       <!-- Chat Messages Scroll Container -->
-      <div id="chatMessages" class="chat-messages px-3 px-md-4 py-3">
+      <div id="chatMessages" class="chat-messages px-2 px-md-4 py-3">
         <!-- Initial Welcome State (rendered dynamically if empty) -->
       </div>
 
       <!-- Chat Input Area -->
-      <div class="chat-input-wrapper px-3 px-md-4 pb-3 pt-2">
+      <div class="chat-input-wrapper px-2 px-md-4 pb-2 pb-md-3 pt-2">
         <div class="chat-input-bar">
           <textarea id="chatInput" rows="1" placeholder="Ask a question about your uploaded documents..." autofocus></textarea>
           <button id="sendBtn" class="btn btn-gradient send-button" title="Send question">
             <i class="bi bi-arrow-up-short fs-4"></i>
           </button>
         </div>
-        <div class="text-center mt-2 text-subtle small" style="font-size: 0.72rem;">
+        <div class="text-center mt-1 mt-md-2 text-subtle small chat-disclaimer">
           IntelliBase answers are generated directly from your uploaded reference documents.
         </div>
       </div>

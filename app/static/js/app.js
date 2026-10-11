@@ -111,11 +111,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+function closeMobileSidebar() {
+  sidebar.classList.remove("open");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (sidebarBackdrop) sidebarBackdrop.classList.remove("show");
+}
+
+function toggleMobileSidebar() {
+  sidebar.classList.toggle("open");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (sidebarBackdrop) {
+    sidebarBackdrop.classList.toggle("show", sidebar.classList.contains("open"));
+  }
+}
+
 function setupEventListeners() {
   // Mobile sidebar drawer toggle
   if (sidebarToggleBtn) {
-    sidebarToggleBtn.addEventListener("click", () => {
-      sidebar.classList.toggle("open");
+    sidebarToggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMobileSidebar();
+    });
+  }
+
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener("click", () => {
+      closeMobileSidebar();
     });
   }
 
@@ -123,7 +145,7 @@ function setupEventListeners() {
   document.addEventListener("click", (e) => {
     if (window.innerWidth < 992 && sidebar.classList.contains("open")) {
       if (!sidebar.contains(e.target) && !sidebarToggleBtn.contains(e.target)) {
-        sidebar.classList.remove("open");
+        closeMobileSidebar();
       }
     }
   });
@@ -222,7 +244,8 @@ function setupEventListeners() {
 function setupTextareaAutoResize() {
   chatInput.addEventListener("input", () => {
     chatInput.style.height = "auto";
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + "px";
+    const maxHeight = window.innerWidth < 768 ? 90 : 140;
+    chatInput.style.height = Math.min(chatInput.scrollHeight, maxHeight) + "px";
   });
 }
 
@@ -299,10 +322,18 @@ async function checkAuth() {
 }
 
 function updateAuthUI() {
+  const userEmailDropdown = document.getElementById("userEmailDropdown");
   if (currentUser) {
     authBtn.classList.add("d-none");
     userProfile.classList.remove("d-none");
-    userEmailText.textContent = currentUser.email;
+    if (userEmailText) {
+      userEmailText.textContent = currentUser.email;
+      userEmailText.title = currentUser.email;
+    }
+    if (userEmailDropdown) {
+      userEmailDropdown.textContent = currentUser.email;
+      userEmailDropdown.title = currentUser.email;
+    }
   } else {
     authBtn.classList.remove("d-none");
     userProfile.classList.add("d-none");
@@ -393,6 +424,7 @@ function startNewChat() {
   deleteActiveChatBtn.classList.add("d-none");
   renderConversationList();
   renderWelcomeScreen();
+  if (window.innerWidth < 992) closeMobileSidebar();
   chatInput.focus();
 }
 
@@ -405,7 +437,7 @@ async function selectConversation(conversationId) {
   currentConversationId = conversationId;
   renderConversationList();
 
-  if (window.innerWidth < 992) sidebar.classList.remove("open");
+  if (window.innerWidth < 992) closeMobileSidebar();
 
   // Show loading indicator in message pane
   chatMessages.innerHTML = `
